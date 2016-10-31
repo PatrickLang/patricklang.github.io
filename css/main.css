@@ -4,5 +4,9 @@ body {
 }
 
 nav {
-	background-color: lightgrey;
+	background-color: #111;
+}
+
+footer {
+	background-color: #111;
 }
