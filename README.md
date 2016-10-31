@@ -5,8 +5,8 @@ I'm setting up a Jekyll-based blog using this helpful [guide](http://jmcglone.co
 
 Worklist:
 
-[ ] set up Jeckyll
-[ ] Get a stylesheet, etc
-[ ] First post - walkthrough of openelp
-[ ] Jekyll in Windows container for local build
+ - [ ] set up Jeckyll
+ - [ ] Get a stylesheet, etc
+ - [ ] First post - walkthrough of openelp
+ - [ ] Jekyll in Windows container for local build
 
