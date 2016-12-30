@@ -12,5 +12,34 @@ date: 2016-12-29
 
 
 ## Enabling Intel AMT and KVM
+When you get a new machine, this is probably disabled by default for security reasons. You will need to enable it, and set a password for the default admin account before you can connect to it remotely.
+
 The steps will vary somewhat by machine. I'm showing the Lenovo Thinkcentre M900, but most business machines should have similar options available in their BIOS/UEFI settings.
 
+1. Enable Intel Manageability Control & MEBx hotkey:
+
+![Enable AMT]({{site.url}}/images/2016-12-29-intel-amt/enable-manageability.PNG)
+
+
+2. Save settings, and enter MEBx
+There should be another prompt to get to the Intel Management Engine (MEBx) settings. On this machine, I needed to press <Ctrl-P> immediately when I turned it on.
+
+Here I needed to:
+- Log into MEBx. The default username is `admin`, and the password is also `admin`
+- Set these settings
+    - Intel ME General settings
+        - Change ME password
+    - Intel AMT Configuration
+        - SOL/Storage Redirection/KVM
+            - Set `Username and Password` = Enabled
+            - Set `SOL` = Enabled
+            - Set `Storage Redirection` = Enabled
+            - Set `KVM Feature Selection` = Enabled
+        - User Consent
+            - Set `User Opt-in` = None
+        - Network Setup
+            - TCP/IP settings
+                - Wired LAN IPV4 Configuration
+                    - `DHCP Mode` = Enabled
+
+## Using MeshCommander to connect
