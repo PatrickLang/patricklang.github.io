@@ -69,3 +69,30 @@ Right click each one in the list, and go to `Edit`. The username (admin) and pas
 
 ![MeshCommander Edit Computer]({{site.url}}/images/2016-12-29-intel-amt/meshcommander-edit.PNG)
 
+Now, you're ready to connect. You can click `Connect` next to any of the computers, or you can hold shift and click it to open it in a new window.
+
+![MeshCommander Connected]({{site.url}}/images/2016-12-29-intel-amt/meshcommander-connected.PNG)
+
+If you click `Remote Desktop` in the left pane, you can normally connect using KVM over IP. However, the first time you need to click the warning at the top, and enable both `Redirection Port` and `Remote Desktop`
+
+![MeshCommander Connected]({{site.url}}/images/2016-12-29-intel-amt/meshcommander-redirection.PNG)
+
+Then, you can connect.
+
+### Installing with an ISO
+Intel AMT & MeshCommander also have _Storage Redirection_, which is convenient for installing an OS from an ISO file. This is convenient, but not as fast as using a USB drive attached directly to the computer or a PXE-based installation.
+
+Click IDE-R, then `Choose file` next to ISO. If you want to use it right away, choose `Start` = Immediately.
+
+![MeshCommander ISO]({{site.url}}/images/2016-12-29-intel-amt/meshcommander-iso.PNG)
+
+To force booting from the ISO, click `Power Actions`, then `Reset to IDE-R CDROM`. That will reset the machine, which will drop the KVM connection. Hit `Connect` again right away so you can watch the boot progress.
+
+If you're booting Windows and there is already an OS installed, be ready to press the _any_ key right away :)
+
+![MeshCommander Booting from ISO]({{site.url}}/images/2016-12-29-intel-amt/meshcommander-boot-iso.png)
+
+I created a Nano Server ISO with the [Nano Server Image Builder](https://blogs.technet.microsoft.com/nanoserver/2016/10/15/introducing-the-nano-server-image-builder/) for this example, so now it's time to just sit back and wait.
+![MeshCommander Installing Nano Server from ISO]({{site.url}}/images/2016-12-29-intel-amt/meshcommander-installing-nano.PNG)
+
+Once it's done, it will automatically reboot and I can disconnect.
