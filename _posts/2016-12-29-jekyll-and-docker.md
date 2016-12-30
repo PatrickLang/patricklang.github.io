@@ -50,4 +50,4 @@ The whole reason I set this up was so that I could take advantage of Jekyll's dr
  docker run --label=jekyll --volume=$(pwd):/srv/jekyll -it -d -p 4000:4000 jekyll/jekyll jekyll serve --drafts
 ```
 
-By running it in the background with `-d`, I can continue to `git pull` to get updated drafts that I'm writing on another machine and render them instantly.
+By running it in the background with `-d`, I can continue to `git pull` on my host to get updated files (including drafts!) from GitHub and render them instantly. Jekyll monitors the directory bound to `/srv/jekyll` so the container doesn't need to be restarted.
