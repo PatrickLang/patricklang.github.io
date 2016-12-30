@@ -5,6 +5,8 @@ date: 2016-12-29
 ---
 
 
+This is a work in progress for building a 3-node cluster lab with Docker Swarm and Windows Failover Clustering
+
 
 ## Mount the server disk image
 mount-diskimage (Get-Item *.iso).fullName
@@ -179,3 +181,36 @@ Server:
  OS/Arch:      windows/amd64
  Experimental: false
  ```
+
+Now that each server is set up with the Docker engine, it's time to form a swarm!
+
+## Setting up Docker Swarm
+
+Setting up a Docker Swarm is just a few easy steps:
+- Run `docker swarm init` on the first node
+- Run `docker swarm join` on each remaining node
+
+
+TL;DR 
+
+```powershell
+# Open the ports on each host
+Invoke-Command -Session $sessions[0] -ScriptBlock { netsh advfirewall firewall add rule name="Docker swarm" dir=in action=allow protocol=TCP localport=2377 }
+Invoke-Command -Session $sessions[1] -ScriptBlock { netsh advfirewall firewall add rule name="Docker swarm" dir=in action=allow protocol=TCP localport=2377 }
+Invoke-Command -Session $sessions[2] -ScriptBlock { netsh advfirewall firewall add rule name="Docker swarm" dir=in action=allow protocol=TCP localport=2377 }
+
+
+# Create the swarm
+Invoke-Command -Session $sessions[0] -ScriptBlock { docker.exe swarm init --advertise-addr $Using:sessions[0].ComputerName }
+
+# Get the manager token
+$managerToken = Invoke-Command -Session $sessions[0] -ScriptBlock { docker.exe swarm join-token manager -q }
+
+# Join the other nodes as managers
+Invoke-Command -Session $sessions[1] -ScriptBlock { docker.exe swarm join --token $Using:managerToken "$($Using:sessions[0].ComputerName):2377" }
+Invoke-Command -Session $sessions[2] -ScriptBlock { docker.exe swarm join --token $Using:managerToken "$($Using:sessions[0].ComputerName):2377" }
+# Each should return "This node joined a swarm as a manager."
+```
+
+## Enable TLS
+
