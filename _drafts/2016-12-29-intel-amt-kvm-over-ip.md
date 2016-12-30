@@ -50,3 +50,22 @@ After the last step, exit MEBx.
 You can unplug the keyboard and mouse, and put it in a closet. It's time to move onto using the KVM to install the OS!
 
 ## Using MeshCommander to connect
+
+Now, launch MeshCommander on another machine.
+
+Click `Scan`, and enter the DHCP IP range for your local network.
+
+![MeshCommander Scan]({{site.url}}/images/2016-12-29-intel-amt/meshcommander-scan.PNG)
+
+After a few seconds, it will list all the machines found with Intel AMT enabled.
+
+![MeshCommander Scan Results]({{site.url}}/images/2016-12-29-intel-amt/meshcommander-results.PNG)
+
+Check the box next to all of them, and click `Ok`
+
+Looks easy, right? Well, not quite. MeshCommander never asked for the username & password.
+
+Right click each one in the list, and go to `Edit`. The username (admin) and password go there.
+
+![MeshCommander Edit Computer]({{site.url}}/images/2016-12-29-intel-amt/meshcommander-edit.PNG)
+
