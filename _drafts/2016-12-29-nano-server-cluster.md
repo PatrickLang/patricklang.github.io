@@ -139,43 +139,8 @@ FullPath             :
 PackageFilename      : Microsoft.PackageManagement.NuGetProvider.dll
 FromTrustedSource    : False
 Summary              : NuGet provider for the OneGet meta-package manager
-SwidTags             : {Microsoft.PackageManagement.Packaging.SoftwareIdentity}
-CanonicalId          : bootstrap:nuget/2.8.5.205#https://oneget.org/nugetv2-coreclr-2.8.5.205.package.swidtag
-Metadata             : {summary,providerName,providerVersion,summary}
-SwidTagText          : <?xml version="1.0" encoding="utf-16" standalone="yes"?>
-                       <SoftwareIdentity
-                         name="nuget"
-                         version="2.8.5.205"
-                         versionScheme="multipartnumeric" xmlns="http://standards.iso.org/iso/19770/-2/2015/schema.xsd">
-                         <Meta
-                           summary="NuGet provider for the OneGet meta-package manager" />
-                         <Meta
-                           providerName="nuget"
-                           providerVersion="2.8.5.205"
-                           summary="NuGet provider for the OneGet meta-package manager" />
-                         <Link
-                           href="https://oneget.org/Microsoft.PackageManagement.NuGetProvider-coreclr-2.8.5.205.dll"
-                           rel="installationmedia"
-                           type="application/octet-stream"
-                           media="(OS:windows)" />
-                       </SoftwareIdentity>
-Dependencies         : {}
-IsCorpus             :
-Name                 : nuget
-Version              : 2.8.5.205
-VersionScheme        : multipartnumeric
-TagVersion           :
-TagId                :
-IsPatch              :
-IsSupplemental       :
-AppliesToMedia       :
-Meta                 : {{summary}, {providerName,providerVersion,summary}}
-Links                : {installationmedia:https://oneget.org/Microsoft.PackageManagement.NuGetProvider-coreclr-2.8.5.205.dll}
-Entities             : {}
-Payload              :
-Evidence             :
-Culture              :
-Attributes           : {name,version,versionScheme}
+...
+
 
 WARNING: KB3176936 or later is required for docker to work. Please ensure this is installed.
 WARNING: A restart is required to start docker service. Please restart your machine.
@@ -193,34 +158,8 @@ FullPath             :
 PackageFilename      :
 FromTrustedSource    : False
 Summary              : Contains the CS Docker Engine for use with Windows Server 2016 and Nano Server.
-SwidTags             : {Microsoft.PackageManagement.Packaging.SoftwareIdentity}
-CanonicalId          : dockermsftprovider:Docker/1.12.2-cs2-ws-beta#DockerDefault
-Metadata             : {summary}
-SwidTagText          : <?xml version="1.0" encoding="utf-16" standalone="yes"?>
-                       <SoftwareIdentity
-                         name="Docker"
-                         version="1.12.2-cs2-ws-beta"
-                         versionScheme="MultiPartNumeric" xmlns="http://standards.iso.org/iso/19770/-2/2015/schema.xsd">
-                         <Meta
-                           summary="Contains the CS Docker Engine for use with Windows Server 2016 and Nano Server." />
-                       </SoftwareIdentity>
-Dependencies         : {}
-IsCorpus             :
-Name                 : Docker
-Version              : 1.12.2-cs2-ws-beta
-VersionScheme        : MultiPartNumeric
-TagVersion           :
-TagId                :
-IsPatch              :
-IsSupplemental       :
-AppliesToMedia       :
-Meta                 : {{summary}}
-Links                : {}
-Entities             : {}
-Payload              :
-Evidence             :
-Culture              :
-Attributes           : {name,version,versionScheme}
+...
+
 
 Client:
  Version:      1.13.0-rc4
