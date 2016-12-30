@@ -41,5 +41,12 @@ Here I needed to:
             - TCP/IP settings
                 - Wired LAN IPV4 Configuration
                     - `DHCP Mode` = Enabled
+            - `Activate Network Access`
+
+![Activate]({{site.url}}/images/2016-12-29-intel-amt/activate.png)
+
+After the last step, exit MEBx.
+
+You can unplug the keyboard and mouse, and put it in a closet. It's time to move onto using the KVM to install the OS!
 
 ## Using MeshCommander to connect
