@@ -180,7 +180,7 @@ Server:
  Built:        Sat Dec 17 01:34:17 2016
  OS/Arch:      windows/amd64
  Experimental: false
- ```
+```
 
 Now that each server is set up with the Docker engine, it's time to form a swarm!
 
