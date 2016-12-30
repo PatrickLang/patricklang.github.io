@@ -128,7 +128,7 @@ Invoke-Command -Session $sessions[2] -FilePath .\install-Docker.ps1
 
 You will see some progress from each OneGet installation followed by a final `docker version` output after the upgrade is done.
 
-```none
+```
 PSComputerName       : 192.168.1.115
 RunspaceId           : 63e5a197-20a2-42fb-a51e-e2071dca6b43
 FastPackageReference : https://oneget.org/nugetv2-coreclr-2.8.5.205.package.swidtag
