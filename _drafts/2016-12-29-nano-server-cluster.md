@@ -42,11 +42,13 @@ Expanding Files Complete ...
 
 <!-- screenshots, etc -->
 
+
+
 ```
 New-NanoServerImage -MediaPath 'G:\' -Edition 'Datacenter' -DeploymentType Host -TargetPath 'e:\nanoserver\m900-2.vhdx' -MaxSize 8589934592 -SetupUI ('NanoServer.Containers', 'NanoServer.FailoverCluster', 'NanoServer.Storage', 'NanoServer.Compute', 'NanoServer.OEM-Drivers') -ServicingPackagePath ('E:\nanoserver\Windows10.0-KB3206632-x64.cab') -ComputerName 'plang-m9-1' -SetupCompleteCommand ('tzutil.exe /s "Pacific Standard Time"') -LogPath 'e:\temp\NanoServerImageBuilder\Logs\2016-12-20 23-08'
 ```
 
-
+> Note - the default image size for the Nano Server image generator is 8GB. The Nano Server installer formats the first disk in the system, copies the VHDX to it, and configures the system to boot from VHDX. As a result - most of your free disk space will be on D:, not C:. This will be important to know later.
 
 ## Create the USB key
 
@@ -70,7 +72,7 @@ http://www.meshcommander.com/meshcommander
 
 
 
-Set up remote management client
+## Set up a workstation for PowerShell remote management
 ```
 net start winrm
 PS C:\WINDOWS\system32> Set-Item WSMan:\localhost\Client\TrustedHosts -Force -Value "192.168.1.114,192.168.1.115,192.168
@@ -89,6 +91,8 @@ Check the version with `(Get-ComputerInfo).WindowsBuildLabEx`:
 ```
 WindowsBuildLabEx                                       : 14393.576.amd64fre.rs1_release_inmarket.161208-2252
 ```
+
+## Install Docker
 
 Now, you may install Docker using Windows PowerShell remoting with the steps described in [Container host deployment - Nano Server](https://docs.microsoft.com/en-us/virtualization/windowscontainers/deploy-containers/deploy-containers-on-nano). However, there are a few workarounds needed.
 
@@ -109,8 +113,12 @@ Start-Service Docker
 docker version
 ```
 
+**Redirecting Docker image storage**
 
-**TL;DR version**
+> TODO
+
+
+**Putting it all together**
 I captured all of this into a [Install-Docker.ps1]({{site.url}}/scripts/2016-12-29-nano-server-cluster/Install-Docker.ps1)script that's easy to run against the remote servers.
 
 ```powershell
@@ -213,4 +221,35 @@ Invoke-Command -Session $sessions[2] -ScriptBlock { docker.exe swarm join --toke
 ```
 
 ## Enable TLS
+PowerShell remoting is great for getting things set up, but Docker also has its own client (docker.exe) that can handle remote connections. You can enable an unencrypted, unauthenticated connection but it's better to secure your connection with TLS. Stefan Scherer has a great post [How to protect a Windows Docker engine with TLS](https://stefanscherer.github.io/protecting-a-windows-2016-docker-engine-with-tls/) on how to achieve this. 
 
+We'll use the same steps, but put the same certificate onto each of the 3 hosts.
+
+Create the certificates and config.json
+```powershell
+# Make a list of all IPs
+$serverIPsJoined = $serverIPs -Join ","
+
+# Create the directories to store the certs and then generate them using the stefanscherer/dockertls-windows container
+Invoke-Command -Session $sessions[0] -ScriptBlock {
+    mkdir server  
+    mkdir client\.docker 
+    docker run --rm `
+        -e SERVER_NAME=$(hostname) `
+        -e IP_ADDRESSES=$Using:serverIPsJoined `
+        -v "$(pwd)\server:C:\ProgramData\docker" `
+        -v "$(pwd)\client\.docker:C:\Users\ContainerAdministrator\.docker" `
+        stefanscherer/dockertls-windows
+}
+```
+> Note: the `docker pull` progress look odd since PowerShell text output redirection doesn't support some console formatting commands
+>  This may take several minutes to download and extract if you haven't used a container based on `microsoft/windowsservercore` before. 
+
+
+Now, open the ports on each host:
+
+```powershell
+Invoke-Command -Session $sessions[0] -ScriptBlock { netsh advfirewall firewall add rule name="Docker Engine (TLS)" dir=in action=allow protocol=TCP localport=2376 }
+Invoke-Command -Session $sessions[1] -ScriptBlock { netsh advfirewall firewall add rule name="Docker Engine (TLS)" dir=in action=allow protocol=TCP localport=2376 }
+Invoke-Command -Session $sessions[2] -ScriptBlock { netsh advfirewall firewall add rule name="Docker Engine (TLS)" dir=in action=allow protocol=TCP localport=2376 }
+```
