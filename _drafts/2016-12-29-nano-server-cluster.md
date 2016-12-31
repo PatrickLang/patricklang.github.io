@@ -326,13 +326,16 @@ Setting up a Docker Swarm is just a few easy steps:
 - Run `docker swarm join` on each remaining node
 
 
-```powershell
-# Open the ports on each host
-Invoke-Command -Session $sessions[0] -ScriptBlock { netsh advfirewall firewall add rule name="Docker swarm" dir=in action=allow protocol=TCP localport=2377 }
-Invoke-Command -Session $sessions[1] -ScriptBlock { netsh advfirewall firewall add rule name="Docker swarm" dir=in action=allow protocol=TCP localport=2377 }
-Invoke-Command -Session $sessions[2] -ScriptBlock { netsh advfirewall firewall add rule name="Docker swarm" dir=in action=allow protocol=TCP localport=2377 }
-```
+**Open the ports on each host**
 
+```powershell
+$sessions | Foreach-Object {
+    Invoke-Command -Session $_ -ScriptBlock { 
+        netsh advfirewall firewall add rule name="Docker swarm - manager" dir=in action=allow protocol=TCP localport=2377 
+        netsh advfirewall firewall add rule name="Docker swarm - node" dir=in action=allow protocol=TCP localport=7946 
+    }
+}
+```
 
 > TODO: This could all be done with docker.exe instead of PowerShell remoting from this point on. Decide which to use.
 
