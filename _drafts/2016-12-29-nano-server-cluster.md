@@ -174,6 +174,10 @@ Server:
 ```
 
 
+Now that each server is set up with the Docker engine, it's time to set up a secured Docker management port and then form a swarm!
+
+
+### The long version...
 
 **Redirecting Docker container and database storage**
 
@@ -206,9 +210,10 @@ Invoke-Command -Session $sessions[0] -ScriptBlock {
 }
 ```
 
-> **Temporary step - update to Docker v1.13-rc4**
-> As of December 2016, the Docker OneGet provider installs a beta version 1.12.2-cs2-ws-beta. Docker Swarm mode requires v1.13, so we need to update to the latest release candidate build. Once v1.13 ships, Docker and Microsoft will be updating the OneGet provider to use it.
->```powershell
+**Temporary step - update to Docker v1.13-rc4**
+As of December 2016, the Docker OneGet provider installs a beta version 1.12.2-cs2-ws-beta. Docker Swarm mode requires v1.13, so we need to update to the latest release candidate build. Once v1.13 ships, Docker and Microsoft will be updating the OneGet provider to use it.
+
+```powershell
 Import-Module "C:\Program Files\WindowsPowerShell\Modules\DockerMsftProvider\1.0.0.1\SaveHTTPItemUsingBITS.psm1"
 Stop-Service Docker
 dockerd.exe --unregister-service
@@ -217,55 +222,23 @@ Expand-Archive -Path "$env:TEMP\docker-1.13.0-rc4.zip" -DestinationPath $env:Pro
 dockerd.exe --register-service
 Start-Service Docker
 ```
->
->Double check that it worked: 
->```
-docker version
+
+Double check that it worked: 
 ```
-
-
-
-Now that each server is set up with the Docker engine, it's time to form a swarm!
-
-## Setting up Docker Swarm
-
-Setting up a Docker Swarm is just a few easy steps:
-- Run `docker swarm init` on the first node
-- Run `docker swarm join` on each remaining node
-
-
-TL;DR 
-
-```powershell
-# Open the ports on each host
-Invoke-Command -Session $sessions[0] -ScriptBlock { netsh advfirewall firewall add rule name="Docker swarm" dir=in action=allow protocol=TCP localport=2377 }
-Invoke-Command -Session $sessions[1] -ScriptBlock { netsh advfirewall firewall add rule name="Docker swarm" dir=in action=allow protocol=TCP localport=2377 }
-Invoke-Command -Session $sessions[2] -ScriptBlock { netsh advfirewall firewall add rule name="Docker swarm" dir=in action=allow protocol=TCP localport=2377 }
-
-
-# Create the swarm
-Invoke-Command -Session $sessions[0] -ScriptBlock { docker.exe swarm init --advertise-addr $Using:sessions[0].ComputerName }
-
-# Get the manager token
-$managerToken = Invoke-Command -Session $sessions[0] -ScriptBlock { docker.exe swarm join-token manager -q }
-
-# Join the other nodes as managers
-Invoke-Command -Session $sessions[1] -ScriptBlock { docker.exe swarm join --token $Using:managerToken "$($Using:sessions[0].ComputerName):2377" }
-Invoke-Command -Session $sessions[2] -ScriptBlock { docker.exe swarm join --token $Using:managerToken "$($Using:sessions[0].ComputerName):2377" }
-# Each should return "This node joined a swarm as a manager."
+docker version
 ```
 
 ## Enable TLS
 PowerShell remoting is great for getting things set up, but Docker also has its own client (docker.exe) that can handle remote connections. You can enable an unencrypted, unauthenticated connection but it's better to secure your connection with TLS. Stefan Scherer has a great post [How to protect a Windows Docker engine with TLS](https://stefanscherer.github.io/protecting-a-windows-2016-docker-engine-with-tls/) on how to achieve this. 
 
-We'll use the same steps, but put the same certificate onto each of the 3 hosts.
+This container wraps up everything needed to:
+- Generate a self-signed certificate authority
+- Create client & server certificates using the CA
+- Modify the local Docker configuration (c:\programdata\docker\config\daemon.json) to listen on port 2376 with TLS enabled
 
-Create the certificates and config.json
+Run it on the first host to generate everything:
+
 ```powershell
-# Make a list of all IPs
-$serverIPsJoined = $serverIPs -Join ","
-
-# Create the directories to store the certs and then generate them using the stefanscherer/dockertls-windows container
 Invoke-Command -Session $sessions[0] -ScriptBlock {
     mkdir $env:SystemDrive\DockerSSLCARoot
     mkdir $env:USERPROFILE\.docker
@@ -282,7 +255,10 @@ Invoke-Command -Session $sessions[0] -ScriptBlock {
 > - The `docker pull` progress look odd since Invoke-Command's output redirection isn't a full console redirection. To work arond this, you can use Enter-PSSession instead.
 > - This may take several minutes to download and extract if you haven't used a container based on `microsoft/windowsservercore` before. 
 
+
 **Copy CA cert from the first server to the others**
+The same CA is needed on the other hosts so that the certs will be trusted on all hosts. Map the C: drive from each host onto your machine, then copy the folder C:\DockerSSLCARoot to each other host.
+
 ```powershell
 New-PSDrive -Name j -Root "\\$($sessions[0].ComputerName)\c$" -Credential $credential -PSProvider FileSystem
 New-PSDrive -Name k -Root "\\$($sessions[1].ComputerName)\c$" -Credential $credential -PSProvider FileSystem
@@ -291,7 +267,17 @@ Copy-Item -Recurse j:\DockerSSLCARoot\ k:\DockerSSLCARoot
 Copy-Item -Recurse j:\DockerSSLCARoot\ l:\DockerSSLCARoot
 ```
 
+**Copy client certificate to your admin workstation**
+Since the drives are mapped, it's also a good time to get the client certificate generated earlier.
+
+```powershell
+# If you didn't use "Administrator" for the Nano Server install, replace it below
+Copy-Item -Recurse j:\users\Administrator\.docker $env:USERPROFILE\.docker
+```
+
 **Generate certs for other two servers**
+Now, the same container can be used with the existing CA to generate certificates on the remaining hosts.
+
 ```powershell
 Invoke-Command -Session $sessions[1] -ScriptBlock {
     mkdir $env:USERPROFILE\.docker
@@ -316,10 +302,47 @@ Invoke-Command -Session $sessions[2] -ScriptBlock {
 }
 ```
 
-Now, open the ports on each host:
+Last, open the ports on each host and restart Docker:
 
 ```powershell
-Invoke-Command -Session $sessions[0] -ScriptBlock { netsh advfirewall firewall add rule name="Docker Engine (TLS)" dir=in action=allow protocol=TCP localport=2376 }
-Invoke-Command -Session $sessions[1] -ScriptBlock { netsh advfirewall firewall add rule name="Docker Engine (TLS)" dir=in action=allow protocol=TCP localport=2376 }
-Invoke-Command -Session $sessions[2] -ScriptBlock { netsh advfirewall firewall add rule name="Docker Engine (TLS)" dir=in action=allow protocol=TCP localport=2376 }
+$sessions | Foreach-Object { 
+    Invoke-Command -Session $_ -ScriptBlock { netsh advfirewall firewall add rule name="Docker Engine (TLS)" dir=in action=allow protocol=TCP localport=2376 ; Restart-Service Docker}
+}
 ```
+
+
+Now, you can set `DOCKER_HOST` and `DOCKER_TLS_VERIFY` to enable TLS and try connecting to a server.
+
+```powershell
+$ENV:DOCKER_HOST="tcp://192.168.1.114:2376"
+$ENV:DOCKER_TLS_VERIFY="1"
+docker version
+```
+
+
+## Setting up Docker Swarm
+Setting up a Docker Swarm is just a few easy steps:
+- Run `docker swarm init` on the first node
+- Run `docker swarm join` on each remaining node
+
+
+```powershell
+# Open the ports on each host
+Invoke-Command -Session $sessions[0] -ScriptBlock { netsh advfirewall firewall add rule name="Docker swarm" dir=in action=allow protocol=TCP localport=2377 }
+Invoke-Command -Session $sessions[1] -ScriptBlock { netsh advfirewall firewall add rule name="Docker swarm" dir=in action=allow protocol=TCP localport=2377 }
+Invoke-Command -Session $sessions[2] -ScriptBlock { netsh advfirewall firewall add rule name="Docker swarm" dir=in action=allow protocol=TCP localport=2377 }
+
+
+# Create the swarm
+Invoke-Command -Session $sessions[0] -ScriptBlock { docker.exe swarm init --advertise-addr $Using:sessions[0].ComputerName }
+
+# Get the manager token
+$managerToken = Invoke-Command -Session $sessions[0] -ScriptBlock { docker.exe swarm join-token manager -q }
+
+# Join the other nodes as managers
+Invoke-Command -Session $sessions[1] -ScriptBlock { docker.exe swarm join --token $Using:managerToken "$($Using:sessions[0].ComputerName):2377" }
+Invoke-Command -Session $sessions[2] -ScriptBlock { docker.exe swarm join --token $Using:managerToken "$($Using:sessions[0].ComputerName):2377" }
+# Each should return "This node joined a swarm as a manager."
+```
+
+> TODO: is another port needed? seems like the local node always listed as "down"
