@@ -174,6 +174,38 @@ Server:
 ```
 
 
+
+**Redirecting Docker container and database storage**
+
+If you don't have at least 20GB of space on C:, now is the right time to choose another place to store container images. If you used the default VHDX size in the Nano Server Image Generator, then it will look something like this.
+
+```
+[192.168.1.115]: PS C:\Users\Administrator\Documents> get-volume
+
+DriveLetter FileSystemLabel FileSystem DriveType HealthStatus OperationalStatus SizeRemaining    Size
+----------- --------------- ---------- --------- ------------ ----------------- -------------    ----
+C                           NTFS       Fixed     Healthy      OK                      6.33 GB 7.65 GB
+D           MAIN            NTFS       Fixed     Healthy      OK                     69.02 GB   80 GB
+```
+
+> Container storage cannot be migrated once any containers have been pulled with `docker pull` or `docker run`
+
+The [Docker Engine on Windows](https://docs.microsoft.com/en-us/virtualization/windowscontainers/manage-docker/configure-docker-daemon) page has many examples, but here are some steps to create a `c:\ProgramData\docker\config\daemon.json` that will move container storage to `d:\docker`.
+
+```powershell
+$daemonjson=@"
+{ 
+    "graph": "d:\\docker"
+}
+"@
+
+Invoke-Command -Session $sessions[0] -ScriptBlock { 
+    Stop-Service docker
+    $Using:daemonjson | Out-File -Encoding ascii c:\ProgramData\docker\config\daemon.json
+    Start-Service docker
+}
+```
+
 > **Temporary step - update to Docker v1.13-rc4**
 > As of December 2016, the Docker OneGet provider installs a beta version 1.12.2-cs2-ws-beta. Docker Swarm mode requires v1.13, so we need to update to the latest release candidate build. Once v1.13 ships, Docker and Microsoft will be updating the OneGet provider to use it.
 >```powershell
@@ -191,36 +223,6 @@ Start-Service Docker
 docker version
 ```
 
-**Redirecting Docker image storage**
-
-If you don't have at least 20GB of space on C:, now is a good time to choose another place to store container images. If you used the default VHDX size in the Nano Server Image Generator, then it will look something like this:
-
-```
-[192.168.1.115]: PS C:\Users\Administrator\Documents> get-volume
-
-DriveLetter FileSystemLabel FileSystem DriveType HealthStatus OperationalStatus SizeRemaining    Size
------------ --------------- ---------- --------- ------------ ----------------- -------------    ----
-C                           NTFS       Fixed     Healthy      OK                      6.33 GB 7.65 GB
-D           MAIN            NTFS       Fixed     Healthy      OK                     69.02 GB   80 GB
-```
-
-
-The [Docker Engine on Windows](https://docs.microsoft.com/en-us/virtualization/windowscontainers/manage-docker/configure-docker-daemon) page has many examples, but here are some steps to create a `c:\ProgramData\docker\config\daemon.json` that will move container storage to `d:\docker`
-
-```powershell
-
-$daemonjson=@"
-{ 
-    "graph": "d:\\docker"
-}
-"@
-
-Invoke-Command -Session $sessions[1] -ScriptBlock { 
-    Stop-Service docker
-    $Using:daemonjson | Out-File -Encoding ascii c:\ProgramData\docker\config\daemon.json
-    Start-Service docker
-}
-```
 
 
 Now that each server is set up with the Docker engine, it's time to form a swarm!
@@ -265,24 +267,54 @@ $serverIPsJoined = $serverIPs -Join ","
 
 # Create the directories to store the certs and then generate them using the stefanscherer/dockertls-windows container
 Invoke-Command -Session $sessions[0] -ScriptBlock {
-    mkdir server  
-    mkdir client\.docker 
+    mkdir $env:SystemDrive\DockerSSLCARoot
+    mkdir $env:USERPROFILE\.docker
     docker run --rm `
         --isolation=hyperv `
         -e SERVER_NAME=$(hostname) `
-        -e IP_ADDRESSES=$Using:serverIPsJoined `
-        -v "$(pwd)\server:C:\ProgramData\docker" `
-        -v "$(pwd)\client\.docker:C:\Users\ContainerAdministrator\.docker" `
-        stefanscherer/dockertls-windows
+        -e IP_ADDRESSES=127.0.0.1,192.168.254.135 `
+        -v "$env:SystemDrive\DockerSSLCARoot:c:\DockerSSLCARoot" `
+        -v "$env:ALLUSERSPROFILE\docker:$env:ALLUSERSPROFILE\docker" `
+        -v "$env:USERPROFILE\.docker:c:\users\containeradministrator\.docker" stefanscherer/dockertls-windows
 }
 ```
 > A few notes...
 > - The `docker pull` progress look odd since Invoke-Command's output redirection isn't a full console redirection. To work arond this, you can use Enter-PSSession instead.
 > - This may take several minutes to download and extract if you haven't used a container based on `microsoft/windowsservercore` before. 
 
-> TODO: Copy CA cert out
+**Copy CA cert from the first server to the others**
+```powershell
+New-PSDrive -Name j -Root "\\$($sessions[0].ComputerName)\c$" -Credential $credential -PSProvider FileSystem
+New-PSDrive -Name k -Root "\\$($sessions[1].ComputerName)\c$" -Credential $credential -PSProvider FileSystem
+New-PSDrive -Name l -Root "\\$($sessions[2].ComputerName)\c$" -Credential $credential -PSProvider FileSystem
+Copy-Item -Recurse j:\DockerSSLCARoot\ k:\DockerSSLCARoot
+Copy-Item -Recurse j:\DockerSSLCARoot\ l:\DockerSSLCARoot
+```
 
-> TODO: generate certs for nth servers & update config.json
+**Generate certs for other two servers**
+```powershell
+Invoke-Command -Session $sessions[1] -ScriptBlock {
+    mkdir $env:USERPROFILE\.docker
+    docker run --rm `
+        --isolation=hyperv `
+        -e SERVER_NAME=$(hostname) `
+        -e IP_ADDRESSES=127.0.0.1,192.168.254.135 `
+        -v "$env:SystemDrive\DockerSSLCARoot:c:\DockerSSLCARoot" `
+        -v "$env:ALLUSERSPROFILE\docker:$env:ALLUSERSPROFILE\docker" `
+        -v "$env:USERPROFILE\.docker:c:\users\containeradministrator\.docker" stefanscherer/dockertls-windows
+}
+
+Invoke-Command -Session $sessions[2] -ScriptBlock {
+    mkdir $env:USERPROFILE\.docker
+    docker run --rm `
+        --isolation=hyperv `
+        -e SERVER_NAME=$(hostname) `
+        -e IP_ADDRESSES=127.0.0.1,192.168.254.135 `
+        -v "$env:SystemDrive\DockerSSLCARoot:c:\DockerSSLCARoot" `
+        -v "$env:ALLUSERSPROFILE\docker:$env:ALLUSERSPROFILE\docker" `
+        -v "$env:USERPROFILE\.docker:c:\users\containeradministrator\.docker" stefanscherer/dockertls-windows
+}
+```
 
 Now, open the ports on each host:
 

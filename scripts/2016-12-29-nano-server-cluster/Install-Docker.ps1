@@ -1,7 +1,25 @@
+# Install the default Docker Engine using the OneGet provider
 Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
 Install-Module -Name DockerMsftProvider -Repository PSGallery -Force
 Install-Package -Name docker -ProviderName DockerMsftProvider -Force
 
+
+# If D: exists and has more space, store containers there
+$daemonjson=@"
+{ 
+    "graph": "d:\\docker"
+}
+"@
+
+if (Test-Path d:\) {
+    if ((Get-Volume c).SizeRemaining -le (Get-Volume d).SizeRemaining) {
+        Stop-Service docker
+        $daemonjson | Out-File -Encoding ascii c:\ProgramData\docker\config\daemon.json
+        Start-Service docker
+    }
+}
+
+# TEMP: Update to Docker v1.13-rc4
 Import-Module "C:\Program Files\WindowsPowerShell\Modules\DockerMsftProvider\1.0.0.1\SaveHTTPItemUsingBITS.psm1"
 Stop-Service Docker
 dockerd.exe --unregister-service
