@@ -245,7 +245,7 @@ Invoke-Command -Session $sessions[0] -ScriptBlock {
     docker run --rm `
         --isolation=hyperv `
         -e SERVER_NAME=$(hostname) `
-        -e IP_ADDRESSES=127.0.0.1,192.168.254.135 `
+        -e IP_ADDRESSES=127.0.0.1,$Using:sessions[0].ComputerName `
         -v "$env:SystemDrive\DockerSSLCARoot:c:\DockerSSLCARoot" `
         -v "$env:ALLUSERSPROFILE\docker:$env:ALLUSERSPROFILE\docker" `
         -v "$env:USERPROFILE\.docker:c:\users\containeradministrator\.docker" stefanscherer/dockertls-windows
@@ -284,7 +284,7 @@ Invoke-Command -Session $sessions[1] -ScriptBlock {
     docker run --rm `
         --isolation=hyperv `
         -e SERVER_NAME=$(hostname) `
-        -e IP_ADDRESSES=127.0.0.1,192.168.254.135 `
+        -e IP_ADDRESSES=127.0.0.1,$Using:sessions[1].ComputerName `
         -v "$env:SystemDrive\DockerSSLCARoot:c:\DockerSSLCARoot" `
         -v "$env:ALLUSERSPROFILE\docker:$env:ALLUSERSPROFILE\docker" `
         -v "$env:USERPROFILE\.docker:c:\users\containeradministrator\.docker" stefanscherer/dockertls-windows
@@ -295,7 +295,7 @@ Invoke-Command -Session $sessions[2] -ScriptBlock {
     docker run --rm `
         --isolation=hyperv `
         -e SERVER_NAME=$(hostname) `
-        -e IP_ADDRESSES=127.0.0.1,192.168.254.135 `
+        -e IP_ADDRESSES=127.0.0.1,$Using:sessions[2].ComputerName `
         -v "$env:SystemDrive\DockerSSLCARoot:c:\DockerSSLCARoot" `
         -v "$env:ALLUSERSPROFILE\docker:$env:ALLUSERSPROFILE\docker" `
         -v "$env:USERPROFILE\.docker:c:\users\containeradministrator\.docker" stefanscherer/dockertls-windows
@@ -331,11 +331,19 @@ Setting up a Docker Swarm is just a few easy steps:
 Invoke-Command -Session $sessions[0] -ScriptBlock { netsh advfirewall firewall add rule name="Docker swarm" dir=in action=allow protocol=TCP localport=2377 }
 Invoke-Command -Session $sessions[1] -ScriptBlock { netsh advfirewall firewall add rule name="Docker swarm" dir=in action=allow protocol=TCP localport=2377 }
 Invoke-Command -Session $sessions[2] -ScriptBlock { netsh advfirewall firewall add rule name="Docker swarm" dir=in action=allow protocol=TCP localport=2377 }
+```
 
 
+> TODO: This could all be done with docker.exe instead of PowerShell remoting from this point on. Decide which to use.
+
+```powershell
 # Create the swarm
 Invoke-Command -Session $sessions[0] -ScriptBlock { docker.exe swarm init --advertise-addr $Using:sessions[0].ComputerName }
+```
 
+> BUG? `docker swarm init` seems to hang. Ctrl-C exits and the swarm seems to be up and running successfully
+
+```powershell
 # Get the manager token
 $managerToken = Invoke-Command -Session $sessions[0] -ScriptBlock { docker.exe swarm join-token manager -q }
 
@@ -346,3 +354,22 @@ Invoke-Command -Session $sessions[2] -ScriptBlock { docker.exe swarm join --toke
 ```
 
 > TODO: is another port needed? seems like the local node always listed as "down"
+
+
+### Launch visualizer
+Mano Marks publishes a visualizer that can show what containers are running on each Docker Swarm node. Stefan Scherer built it to run on Windows as part of his lab https://github.com/StefanScherer/docker-windows-box/tree/master/swarm-mode. 
+
+> TODO: The same tool will work great here with a few modifications to use TLS. Not working yet as written
+
+
+```powershell
+$ip=(Get-NetIPAddress -AddressFamily IPv4 `
+   | Where-Object -FilterScript { $_.InterfaceAlias -Eq "vEthernet (HNS Internal NIC)" } `
+   ).IPAddress
+
+docker run -d -p 8080:8080 -e DOCKER_HOST=${ip}:2376 `
+                           -e DOCKER_TLS_VERIFY=1 `
+                           -v "$env:USERPROFILE\.docker:c:\users\containeradministrator\.docker" `
+                           --name=visualizer `
+                           stefanscherer/visualizer-windows
+```
