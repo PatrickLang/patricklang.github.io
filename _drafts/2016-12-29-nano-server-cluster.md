@@ -92,34 +92,7 @@ Check the version with `(Get-ComputerInfo).WindowsBuildLabEx`:
 WindowsBuildLabEx                                       : 14393.576.amd64fre.rs1_release_inmarket.161208-2252
 ```
 
-## Install Docker
-
-Now, you may install Docker using Windows PowerShell remoting with the steps described in [Container host deployment - Nano Server](https://docs.microsoft.com/en-us/virtualization/windowscontainers/deploy-containers/deploy-containers-on-nano). However, there are a few workarounds needed.
-
-> **Temporary step - update to Docker v1.13-rc4**
-> As of December 2016, the Docker OneGet provider installs a beta version 1.12.2-cs2-ws-beta. Docker Swarm mode requires v1.13, so we need to update to the latest release candidate build. Once v1.13 ships, Docker and Microsoft will be updating the OneGet provider to use it.
->```powershell
-Import-Module "C:\Program Files\WindowsPowerShell\Modules\DockerMsftProvider\1.0.0.1\SaveHTTPItemUsingBITS.psm1"
-Stop-Service Docker
-dockerd.exe --unregister-service
-Save-HTTPItemUsingBitsTransfer -Uri "https://test.docker.com/builds/Windows/x86_64/docker-1.13.0-rc4.zip" -Destination "$env:TEMP\docker-1.13.0-rc4.zip" 
-Expand-Archive -Path "$env:TEMP\docker-1.13.0-rc4.zip" -DestinationPath $env:ProgramFiles -Force
-dockerd.exe --register-service
-Start-Service Docker
-```
->
->Double check that it worked: 
->```
-docker version
-```
-
-**Redirecting Docker image storage**
-
-> TODO
-
-
-**Putting it all together**
-I captured all of this into a [Install-Docker.ps1]({{site.url}}/scripts/2016-12-29-nano-server-cluster/Install-Docker.ps1)script that's easy to run against the remote servers.
+Since I'm setting up multiple machines, I'll save time by opening PowerShell sessions to each. Now I can forget about username, passwords, and IPs.
 
 ```powershell
 # Capture the administrator password
@@ -128,7 +101,17 @@ $credential = get-credential
 # Get a list of server IPs and create a session for each one
 $serverIPs = "192.168.1.114", "192.168.1.115", "192.168.1.116"
 $sessions =  $serverIPs | ForEach-Object { New-PSSession -ComputerName $_ -Credential $credential }
+```
 
+## Install Docker
+
+Now, you may install Docker using Windows PowerShell remoting with the steps described in [Container host deployment - Nano Server](https://docs.microsoft.com/en-us/virtualization/windowscontainers/deploy-containers/deploy-containers-on-nano). However, there are a few workarounds needed.
+
+
+**TL;DR Version**
+I captured all of the steps I used into [Install-Docker.ps1]({{site.url}}/scripts/2016-12-29-nano-server-cluster/Install-Docker.ps1) that's easy to run against the remote servers. You can modify and reuse it for your needs, or read on to learn more of the details.
+
+```powershell
 # Run against the remote servers one at a time so you can watch Progress
 Invoke-Command -Session $sessions[0] -FilePath .\install-Docker.ps1
 Invoke-Command -Session $sessions[1] -FilePath .\install-Docker.ps1
@@ -190,6 +173,56 @@ Server:
  Experimental: false
 ```
 
+
+> **Temporary step - update to Docker v1.13-rc4**
+> As of December 2016, the Docker OneGet provider installs a beta version 1.12.2-cs2-ws-beta. Docker Swarm mode requires v1.13, so we need to update to the latest release candidate build. Once v1.13 ships, Docker and Microsoft will be updating the OneGet provider to use it.
+>```powershell
+Import-Module "C:\Program Files\WindowsPowerShell\Modules\DockerMsftProvider\1.0.0.1\SaveHTTPItemUsingBITS.psm1"
+Stop-Service Docker
+dockerd.exe --unregister-service
+Save-HTTPItemUsingBitsTransfer -Uri "https://test.docker.com/builds/Windows/x86_64/docker-1.13.0-rc4.zip" -Destination "$env:TEMP\docker-1.13.0-rc4.zip" 
+Expand-Archive -Path "$env:TEMP\docker-1.13.0-rc4.zip" -DestinationPath $env:ProgramFiles -Force
+dockerd.exe --register-service
+Start-Service Docker
+```
+>
+>Double check that it worked: 
+>```
+docker version
+```
+
+**Redirecting Docker image storage**
+
+If you don't have at least 20GB of space on C:, now is a good time to choose another place to store container images. If you used the default VHDX size in the Nano Server Image Generator, then it will look something like this:
+
+```
+[192.168.1.115]: PS C:\Users\Administrator\Documents> get-volume
+
+DriveLetter FileSystemLabel FileSystem DriveType HealthStatus OperationalStatus SizeRemaining    Size
+----------- --------------- ---------- --------- ------------ ----------------- -------------    ----
+C                           NTFS       Fixed     Healthy      OK                      6.33 GB 7.65 GB
+D           MAIN            NTFS       Fixed     Healthy      OK                     69.02 GB   80 GB
+```
+
+
+The [Docker Engine on Windows](https://docs.microsoft.com/en-us/virtualization/windowscontainers/manage-docker/configure-docker-daemon) page has many examples, but here are some steps to create a `c:\ProgramData\docker\config\daemon.json` that will move container storage to `d:\docker`
+
+```powershell
+
+$daemonjson=@"
+{ 
+    "graph": "d:\\docker"
+}
+"@
+
+Invoke-Command -Session $sessions[1] -ScriptBlock { 
+    Stop-Service docker
+    $Using:daemonjson | Out-File -Encoding ascii c:\ProgramData\docker\config\daemon.json
+    Start-Service docker
+}
+```
+
+
 Now that each server is set up with the Docker engine, it's time to form a swarm!
 
 ## Setting up Docker Swarm
@@ -235,6 +268,7 @@ Invoke-Command -Session $sessions[0] -ScriptBlock {
     mkdir server  
     mkdir client\.docker 
     docker run --rm `
+        --isolation=hyperv `
         -e SERVER_NAME=$(hostname) `
         -e IP_ADDRESSES=$Using:serverIPsJoined `
         -v "$(pwd)\server:C:\ProgramData\docker" `
@@ -242,9 +276,13 @@ Invoke-Command -Session $sessions[0] -ScriptBlock {
         stefanscherer/dockertls-windows
 }
 ```
-> Note: the `docker pull` progress look odd since PowerShell text output redirection doesn't support some console formatting commands
->  This may take several minutes to download and extract if you haven't used a container based on `microsoft/windowsservercore` before. 
+> A few notes...
+> - The `docker pull` progress look odd since Invoke-Command's output redirection isn't a full console redirection. To work arond this, you can use Enter-PSSession instead.
+> - This may take several minutes to download and extract if you haven't used a container based on `microsoft/windowsservercore` before. 
 
+> TODO: Copy CA cert out
+
+> TODO: generate certs for nth servers & update config.json
 
 Now, open the ports on each host:
 
