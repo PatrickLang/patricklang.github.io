@@ -281,10 +281,13 @@ Now, the same container can be used with the existing CA to generate certificate
 ```powershell
 Invoke-Command -Session $sessions[1] -ScriptBlock {
     mkdir $env:USERPROFILE\.docker
+    $internalNatIp=(Get-NetIPAddress -AddressFamily IPv4 `
+        | Where-Object -FilterScript { $_.InterfaceAlias -Eq "vEthernet (HNS Internal NIC)" } `
+        ).IPAddress
     docker run --rm `
         --isolation=hyperv `
         -e SERVER_NAME=$(hostname) `
-        -e IP_ADDRESSES=127.0.0.1,$Using:sessions[1].ComputerName `
+        -e IP_ADDRESSES=127.0.0.1,$internalNatIp,$Using:sessions[1].ComputerName `
         -v "$env:SystemDrive\DockerSSLCARoot:c:\DockerSSLCARoot" `
         -v "$env:ALLUSERSPROFILE\docker:$env:ALLUSERSPROFILE\docker" `
         -v "$env:USERPROFILE\.docker:c:\users\containeradministrator\.docker" stefanscherer/dockertls-windows
@@ -292,10 +295,13 @@ Invoke-Command -Session $sessions[1] -ScriptBlock {
 
 Invoke-Command -Session $sessions[2] -ScriptBlock {
     mkdir $env:USERPROFILE\.docker
+    $internalNatIp=(Get-NetIPAddress -AddressFamily IPv4 `
+        | Where-Object -FilterScript { $_.InterfaceAlias -Eq "vEthernet (HNS Internal NIC)" } `
+        ).IPAddress
     docker run --rm `
         --isolation=hyperv `
         -e SERVER_NAME=$(hostname) `
-        -e IP_ADDRESSES=127.0.0.1,$Using:sessions[2].ComputerName `
+        -e IP_ADDRESSES=127.0.0.1,$internalNatIp,$Using:sessions[2].ComputerName `
         -v "$env:SystemDrive\DockerSSLCARoot:c:\DockerSSLCARoot" `
         -v "$env:ALLUSERSPROFILE\docker:$env:ALLUSERSPROFILE\docker" `
         -v "$env:USERPROFILE\.docker:c:\users\containeradministrator\.docker" stefanscherer/dockertls-windows
@@ -364,15 +370,26 @@ Mano Marks publishes a visualizer that can show what containers are running on e
 
 > TODO: The same tool will work great here with a few modifications to use TLS. Not working yet as written
 
+> TODO: The steps above don't put the server's hns internal IP in subjectAltName, so it will fail 
+> ```
+problem with request: Hostname/IP doesn't match certificate's altnames: "IP: 172.29.32.1 is not in the cert's list: 127.0.0.1, 192.168.1.116"
+Error: Hostname/IP doesn't match certificate's altnames: "IP: 172.29.32.1 is not in the cert's list: 127.0.0.1, 192.168.1.116"
+    at Object.checkServerIdentity (tls.js:199:17)
+    at TLSSocket.<anonymous> (_tls_wrap.js:1085:29)
+    at emitNone (events.js:86:13)
+    at TLSSocket.emit (events.js:185:7)
+    at TLSSocket._finishInit (_tls_wrap.js:603:8)
+    at TLSWrap.ssl.onhandshakedone (_tls_wrap.js:433:38)
+```   
 
 ```powershell
-$ip=(Get-NetIPAddress -AddressFamily IPv4 `
+$internalNatIp=(Get-NetIPAddress -AddressFamily IPv4 `
    | Where-Object -FilterScript { $_.InterfaceAlias -Eq "vEthernet (HNS Internal NIC)" } `
    ).IPAddress
 
-docker run -d -p 8080:8080 -e DOCKER_HOST=${ip}:2376 `
+docker run -d -p 8080:8080 -e DOCKER_HOST=${internalNatIp}:2376 `
                            -e DOCKER_TLS_VERIFY=1 `
                            -v "$env:USERPROFILE\.docker:c:\users\containeradministrator\.docker" `
                            --name=visualizer `
-                           stefanscherer/visualizer-windows
+                           stefanscherer/visualizer-windows:allow-tls
 ```
