@@ -1,11 +1,8 @@
 ---
 layout: post
 title: "Using a UPS to gracefully shut down a headless Hyper-V Server"
-date: 2016-12-29
+date: 2017-02-06
 ---
-
-
-## Overview
 
 I run most of my servers with [Microsoft Hyper-V Server](https://technet.microsoft.com/en-us/hyper-v-server-docs/hyper-v-server-2016), which is a free version of the Microsoft Hyper-V hypervisor and just enough of an OS to support using Windows drivers and remote management with PowerShell or Remote Desktop. If you have used VMWare ESXi Server, you could compare it to this.
 
