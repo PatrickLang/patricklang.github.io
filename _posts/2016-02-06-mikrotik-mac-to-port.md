@@ -17,7 +17,7 @@ Once you have the MAC address, go see what port it's connected to. There may be 
 
 ## Finding the switch port by MAC address
 
-`/interface ethernet switch host print` will show all of the devices on the network by MAC address, along with the port they're connected to.
+`/interface ethernet switch host print` will show all of the devices on the network by MAC address, along with the port they're connected to. This is very similar to the `show mac address-table` command on Cisco Catalyst switches.
 
 ```
 [admin@MikroTik] /interface ethernet> /interface ethernet switch host print
