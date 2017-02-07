@@ -35,5 +35,6 @@ Flags: D - dynamic, I - invalid
 ## Toggling the switch port
 
 If `00:1B:21:6A:92:AE` is what you were looking for, then you can cycle that port by disabling it, then enabling it:
+
  - `set ether5 disabled=yes`
  - `set ether5 disabled=no`
